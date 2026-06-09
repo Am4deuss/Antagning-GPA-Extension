@@ -1,3 +1,4 @@
+/* Huvudcontainer för widgeten */
 #antagning-math-widget {
   position: fixed;
   bottom: 25px;
@@ -11,60 +12,105 @@
   padding: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.12);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-sizing: border-box !important;
 }
 
+/* Rubrikstilar */
 #antagning-math-widget h3 {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: #4a5568;
+  margin: 0 0 8px 0 !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.6px !important;
+  color: #4a5568 !important;
+  font-weight: 700 !important;
 }
 
 #antagning-math-widget hr {
-  border: 0;
-  border-top: 1px solid #edf2f7;
-  margin-bottom: 12px;
+  border: 0 !important;
+  border-top: 1px solid #edf2f7 !important;
+  margin: 0 0 12px 0 !important;
 }
 
+/* Sektionsindelning för BI och BII */
+#antagning-math-widget .group-section {
+  display: block !important;
+  margin-bottom: 10px !important;
+}
+
+#antagning-math-widget .group-title {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  margin-bottom: 8px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+/* Grupp-badges (BI / BII) */
+#antagning-math-widget .badge-bi {
+  background: #f0fdf4 !important;
+  color: #166534 !important;
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+  border-radius: 3px !important;
+  font-weight: 600 !important;
+}
+
+#antagning-math-widget .badge-bii {
+  background: #eff6ff !important;
+  color: #1e40af !important;
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+  border-radius: 3px !important;
+  font-weight: 600 !important;
+}
+
+/* Poäng- och resultatrader */
 #antagning-math-widget .score-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
-  margin-bottom: 6px;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  font-size: 13.5px !important;
+  margin-bottom: 5px !important;
+  color: #334155 !important;
 }
 
+/* Slutgiltig rad (BI / BII summering) */
 #antagning-math-widget .final-row {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #edf2f7;
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  border-top: 1px solid #edf2f7 !important;
 }
 
 #antagning-math-widget .final-score-value {
-  color: #006a44;
-  font-size: 18px;
-  font-weight: 800;
+  color: #006a44 !important;
+  font-size: 17px !important;
+  font-weight: 800 !important;
 }
 
+/* Statistikrad (Småtext under blocken) */
 #antagning-math-widget .stats-row {
-  font-size: 11px;
-  color: #718096;
-  margin-top: 4px;
-  margin-bottom: 14px;
+  font-size: 11px !important;
+  color: #718096 !important;
+  margin-top: 2px !important;
+  margin-bottom: 4px !important;
 }
 
+/* Analysboxen för Meritpoäng */
 #antagning-math-widget .merit-analysis-box {
   background: #f8fafc !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 6px !important;
   padding: 12px !important;
+  box-sizing: border-box !important;
 }
 
 #antagning-math-widget .merit-analysis-box h4 {
   margin: 0 0 4px 0 !important;
   font-size: 12px !important;
   color: #1e293b !important;
+  font-weight: 600 !important;
 }
 
 #antagning-math-widget .merit-disclaimer {
@@ -74,72 +120,78 @@
   line-height: 1.4 !important;
 }
 
-/* Dropdown / Accordion Styling */
+/* Dropdown / Accordion container */
 #antagning-math-widget .dropdown-container {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
 }
 
+/* Enskild dropdown-meny (<details>) */
 #antagning-math-widget .merit-dropdown {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 4px !important;
-  overflow: hidden;
+  overflow: hidden !important;
+  display: block !important;
   transition: all 0.2s ease;
 }
 
 #antagning-math-widget .merit-dropdown[open] {
   border-color: #cbd5e1 !important;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
 }
 
+/* Klickbar yta i dropdown (<summary>) */
 #antagning-math-widget .merit-dropdown summary {
   display: flex !important;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: space-between !important;
+  align-items: center !important;
   padding: 8px 10px !important;
   cursor: pointer !important;
-  user-select: none;
-  list-style: none !important; /* Döljer standard-pilen i Chrome */
+  user-select: none !important;
+  list-style: none !important; /* Gömmer standard-pilen i Chrome/Safari */
 }
 
-/* Döljer standardpilen i Firefox */
+/* Gömmer standardpilen i äldre Webkit-läsare */
 #antagning-math-widget .merit-dropdown summary::-webkit-details-marker {
   display: none !important;
 }
 
+/* Header inuti dropdown-ytan */
 #antagning-math-widget .summary-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-grow: 1;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-grow: 1 !important;
 }
 
 #antagning-math-widget .contribution-text {
-  font-size: 11px;
-  font-weight: 700;
-  margin-left: auto;
-  padding-right: 6px;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  margin-left: auto !important;
+  padding-right: 6px !important;
 }
 
+/* Indikator-pil för dropdown */
 #antagning-math-widget .dropdown-arrow {
-  font-size: 9px;
-  color: #94a3b8;
-  transition: transform 0.2s ease;
+  font-size: 9px !important;
+  color: #94a3b8 !important;
+  transition: transform 0.2s ease !important;
 }
 
+/* Rotera pilen när menyn öppnas */
 #antagning-math-widget .merit-dropdown[open] .dropdown-arrow {
-  transform: rotate(180deg);
+  transform: rotate(180deg) !important;
 }
 
 /* Kurslistan inuti dropdownen */
 #antagning-math-widget .dropdown-course-list {
   list-style: none !important;
-  padding: 0 10px 8px 10px !important;
+  padding: 4px 10px 8px 10px !important;
   margin: 0 !important;
-  background: #fafafa;
-  border-top: 1px solid #f1f5f9;
+  background: #fafafa !important;
+  border-top: 1px solid #f1f5f9 !important;
 }
 
 #antagning-math-widget .dropdown-course-list li {
@@ -148,45 +200,58 @@
   font-size: 11px !important;
   padding: 5px 0 !important;
   color: #475569 !important;
-  border-bottom: 1px dashed #f1f5f9;
+  border-bottom: 1px dashed #f1f5f9 !important;
+  background: none !important;
 }
 
 #antagning-math-widget .dropdown-course-list li:last-child {
-  border-bottom: none;
+  border-bottom: none !important;
 }
 
 #antagning-math-widget .dropdown-course-list .bullet {
-  color: #cbd5e1;
-  margin-right: 6px;
+  color: #cbd5e1 !important;
+  margin-right: 6px !important;
+  font-weight: bold !important;
 }
 
 #antagning-math-widget .dropdown-course-list .c-name {
-  font-weight: 500;
+  font-weight: 500 !important;
 }
 
 #antagning-math-widget .dropdown-course-list .c-points {
-  margin-left: auto;
-  font-style: italic;
-  color: #94a3b8;
+  margin-left: auto !important;
+  font-style: italic !important;
+  color: #94a3b8 !important;
 }
 
-/* Badges */
+/* Ämnes-badges (Färgkodning) */
 #antagning-math-widget .course-badge {
   font-size: 9px !important;
   font-weight: 700 !important;
   padding: 2px 6px !important;
   border-radius: 3px !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.3px !important;
+  display: inline-block !important;
 }
 
-#antagning-math-widget .course-badge.engelska { background: #e0f2fe !important; color: #0369a1 !important; }
-#antagning-math-widget .course-badge.matematik { background: #fef3c7 !important; color: #b45309 !important; }
-#antagning-math-widget .course-badge.moderna-språk { background: #fce7f3 !important; color: #be185d !important; }
+#antagning-math-widget .course-badge.engelska { 
+  background: #e0f2fe !important; 
+  color: #0369a1 !important; 
+}
+#antagning-math-widget .course-badge.matematik { 
+  background: #fef3c7 !important; 
+  color: #b45309 !important; 
+}
+#antagning-math-widget .course-badge.moderna-språk { 
+  background: #fce7f3 !important; 
+  color: #be185d !important; 
+}
 
+/* Tomt tillstånd (om inga kurser hittas) */
 #antagning-math-widget .empty-merit {
   font-size: 11px !important;
   color: #94a3b8 !important;
-  text-align: center;
-  margin: 8px 0 0 0;
+  text-align: center !important;
+  margin: 8px 0 0 0 !important;
 }

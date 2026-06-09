@@ -1,43 +1,74 @@
 window.addEventListener('load', () => {
-  setTimeout(calculateGeneralAdmissions, 1000);
+  setTimeout(calculateSplitAdmissions, 1000);
 });
 
-function calculateGeneralAdmissions() {
-  const rows = document.querySelectorAll('.table-desktop tbody tr');
+function calculateSplitAdmissions() {
+  // Hämtar alla tabellrader på hela sidan
+  const rows = document.querySelectorAll('.table-desktop tbody tr, table tbody tr');
   if (rows.length === 0) return;
 
   const gradeScale = { 'A': 20.0, 'B': 17.5, 'C': 15.0, 'D': 12.5, 'E': 10.0, 'F': 0.0 };
-  let parsedCourses = [];
+  let gymnasieCourses = [];
+  let komvuxCourses = [];
 
   rows.forEach(row => {
     const cells = row.querySelectorAll('td, th');
     if (cells.length < 4) return;
 
+    // Standardisera kolumnindexering baserat på Antagnings layout
     const name = cells[0].innerText.trim();
     const code = cells[1].innerText.trim().toUpperCase();
     const grade = cells[2].innerText.trim().toUpperCase();
     const credits = parseInt(cells[3].innerText.trim(), 10);
-    const note = cells[4] ? cells[4].innerText.trim().toUpperCase() : '';
+    
+    // Samla ihop all text i raden för att leta efter "Komvux" eller "Enstaka" som fallback
+    const rowText = row.innerText.toLowerCase();
+    const parentSection = row.closest('.betyg-section, div, table')?.innerText.toLowerCase() || '';
 
     if (isNaN(credits)) return;
 
-    parsedCourses.push({
-      name,
-      code,
-      grade,
-      gradeValue: gradeScale[grade] || 0,
-      credits,
-      isExtended: (note === 'U' || note.includes('U'))
+    // TRÄFFSÄKER DETEKTERING AV KOMVUX:
+    // 1. Om cellen längst till höger (Från) innehåller Komvux
+    // 2. Om raden ligger i en container eller tabell märkt med "enstaka betyg" eller "vuxen"
+    // 3. Om sista kolumnen/anmärkningen innehåller ett rent 'V'
+    let isKomvux = false;
+    cells.forEach(cell => {
+      const cellText = cell.innerText.trim().toLowerCase();
+      if (cellText === 'komvux' || cellText === 'v') {
+        isKomvux = true;
+      }
     });
+
+    if (rowText.includes('komvux') || parentSection.includes('enstaka betyg') || parentSection.includes('vuxen')) {
+      isKomvux = true;
+    }
+
+    const isExtended = rowText.includes(' utökad') || rowText.includes(' (u)');
+    const isGymnasiearbete = name.toLowerCase().includes('gymnasiearbete') || code === 'GYARTE';
+
+    const courseObj = { name, code, grade, gradeValue: gradeScale[grade] || 0, credits, isExtended, isGymnasiearbete };
+
+    if (isGymnasiearbete) {
+      gymnasieCourses.push(courseObj);
+    } else if (isKomvux) {
+      komvuxCourses.push(courseObj);
+    } else {
+      gymnasieCourses.push(courseObj);
+    }
   });
 
-  const baseResult = calculateStandardGpa(parsedCourses);
-  const meritResult = calculateAdvancedMerit(parsedCourses);
+  // 1. Beräkna REN BI (Matematik 5 från Komvux exkluderas helt härifrån)
+  const biResult = calculateGpaTrack(gymnasieCourses);
+  const biMerit = calculateAdvancedMerit([...gymnasieCourses]);
 
-  injectGeneralWidget(baseResult, meritResult);
+  // 2. Beräkna BII (Inkluderar alla ordinarie kurser + alla komvuxkompletteringar)
+  const biiResult = calculateGpaTrack([...gymnasieCourses, ...komvuxCourses]);
+  const biiMerit = calculateAdvancedMerit([...gymnasieCourses, ...komvuxCourses]);
+
+  injectSplitWidget(biResult, biMerit, biiResult, biiMerit, komvuxCourses.length);
 }
 
-function calculateStandardGpa(courses) {
+function calculateGpaTrack(courses) {
   let totalPoints = 0;
   let totalCreditsForGpa = 0;
   let totalCreditsOverall = 0;
@@ -45,8 +76,7 @@ function calculateStandardGpa(courses) {
   courses.forEach(c => {
     totalCreditsOverall += c.credits;
 
-    const isGymnasiearbete = c.name.toLowerCase().includes('gymnasiearbete') || c.code === 'GYARTE';
-    if (isGymnasiearbete || c.isExtended) return; 
+    if (c.isGymnasiearbete || c.isExtended) return;
 
     totalPoints += c.gradeValue * c.credits;
     totalCreditsForGpa += c.credits;
@@ -70,7 +100,7 @@ function calculateAdvancedMerit(courses) {
     const nameLower = c.name.toLowerCase();
     const codePrefix = c.code.substring(0, 6);
     
-    if (c.grade === 'F' || c.grade === '-') return;
+    if (c.grade === 'F' || c.grade === '-' || c.isGymnasiearbete) return;
 
     if (nameLower.includes('engelska 6') || c.code === 'ENGENG06') {
       categories['Engelska'].courses.push({ name: 'Engelska 6', points: 0.5 });
@@ -113,109 +143,85 @@ function calculateAdvancedMerit(courses) {
   });
 
   let totalMeritBidrag = 0;
-  let flatCourseList = [];
-
   for (let catName in categories) {
     let cat = categories[catName];
     cat.actualContribution = Math.min(cat.rawPoints, cat.maxCap);
     totalMeritBidrag += cat.actualContribution;
-
-    cat.courses.forEach(course => {
-      flatCourseList.push({
-        ...course,
-        category: catName,
-        catActual: cat.actualContribution,
-        catRaw: cat.rawPoints,
-        catCap: cat.maxCap
-      });
-    });
   }
-
   totalMeritBidrag = Math.min(totalMeritBidrag, 2.5);
 
-  return {
-    courses: flatCourseList,
-    categories: categories,
-    totalMerit: totalMeritBidrag
-  };
+  return { categories, totalMerit: totalMeritBidrag };
 }
 
-function injectGeneralWidget(baseResult, meritResult) {
+function injectSplitWidget(bi, biMerit, bii, biiMerit, komvuxCount) {
   const existing = document.getElementById('antagning-math-widget');
   if (existing) existing.remove();
 
   const widget = document.createElement('div');
   widget.id = 'antagning-math-widget';
-  
-  let meritHtml = '';
-  if (meritResult.courses.length === 0) {
-    meritHtml = '<p class="empty-merit">Inga meritkurser hittades på sidan.</p>';
-  } else {
-    meritHtml = '<div class="dropdown-container">';
-    
-    for (let catName in meritResult.categories) {
-      const cat = meritResult.categories[catName];
-      if (cat.courses.length === 0) continue;
 
-      const isCapped = cat.rawPoints > cat.maxCap;
+  const finalBI = bi.gpa + biMerit.totalMerit;
+  const finalBII = bii.gpa + biiMerit.totalMerit;
 
-      meritHtml += `
-        <details class="merit-dropdown">
-          <summary>
-            <div class="summary-header">
-              <span class="course-badge ${catName.toLowerCase().replace(' ', '-')}">${catName}</span>
-              <span class="contribution-text" style="color: ${isCapped ? '#cc2929' : '#047857'}">
-                +${cat.actualContribution.toFixed(1)} p ${isCapped ? `(Tak: ${cat.maxCap.toFixed(1)})` : ''}
-              </span>
-            </div>
-            <span class="dropdown-arrow">▼</span>
-          </summary>
-          <ul class="dropdown-course-list">
-      `;
+  // Vi bygger dropdown-listan baserat på BII här så man ser ALLA kurser (inklusive Matte 5)
+  let meritDropdownsHtml = '<div class="dropdown-container">';
+  for (let catName in biiMerit.categories) {
+    const cat = biiMerit.categories[catName];
+    if (cat.courses.length === 0) continue;
+    const isCapped = cat.rawPoints > cat.maxCap;
 
-      cat.courses.forEach(course => {
-        meritHtml += `
-          <li>
-            <span class="bullet">•</span>
-            <span class="c-name">${course.name}</span>
-            <span class="c-points">(+${course.points.toFixed(1)} p)</span>
-          </li>
-        `;
-      });
-
-      meritHtml += `
-          </ul>
-        </details>
-      `;
-    }
-    meritHtml += '</div>';
+    meritDropdownsHtml += `
+      <details class="merit-dropdown">
+        <summary>
+          <div class="summary-header">
+            <span class="course-badge ${catName.toLowerCase().replace(' ', '-')}">${catName}</span>
+            <span class="contribution-text" style="color: ${isCapped ? '#cc2929' : '#047857'}">
+              +${cat.actualContribution.toFixed(1)} p ${isCapped ? `(Tak: ${cat.maxCap.toFixed(1)})` : ''}
+            </span>
+          </div>
+          <span class="dropdown-arrow">▼</span>
+        </summary>
+        <ul class="dropdown-course-list">
+    `;
+    cat.courses.forEach(course => {
+      meritDropdownsHtml += `<li><span class="bullet">•</span><span class="c-name">${course.name}</span><span class="c-points">(+${course.points.toFixed(1)} p)</span></li>`;
+    });
+    meritDropdownsHtml += `</ul></details>`;
   }
-
-  const slutgiltigtMeritvärde = baseResult.gpa + meritResult.totalMerit;
+  meritDropdownsHtml += '</div>';
 
   widget.innerHTML = `
-    <h3>🎓 Antagningsnivå</h3>
+    <h3>🎓 Antagningsnivåer</h3>
     <hr>
-    <div class="score-row">
-      <span>Jämförelsetal (BI):</span>
-      <strong>${baseResult.gpa.toFixed(2)}</strong>
+    
+    <div class="group-section">
+      <div class="group-title">Direktgruppen (BI) <span class="badge-bi">Gymnasieexamen</span></div>
+      <div class="score-row"><span>Jämförelsetal (BI):</span> <strong>${bi.gpa.toFixed(2)}</strong></div>
+      <div class="score-row"><span>Meritpoäng (BI):</span> <strong style="color: #047857;">+${biMerit.totalMerit.toFixed(2)}</strong></div>
+      <div class="score-row final-row">
+        <span><strong>Slutgiltigt Meritvärde (BI):</strong></span>
+        <strong class="final-score-value">${finalBI.toFixed(2)}</strong>
+      </div>
+      <div class="score-row stats-row"><span>Poäng i BI: ${bi.calculatedCredits}p</span></div>
     </div>
-    <div class="score-row">
-      <span>Meritpoäng (Max 2.5):</span>
-      <strong style="color: #047857;">+${meritResult.totalMerit.toFixed(2)}</strong>
-    </div>
-    <div class="score-row final-row">
-      <span><strong>Slutgiltigt Meritvärde:</strong></span>
-      <strong class="final-score-value">${slutgiltigtMeritvärde.toFixed(2)}</strong>
-    </div>
-    <div class="score-row stats-row">
-      <span>Räknade poäng: ${baseResult.calculatedCredits}p (Totalt ${baseResult.totalCredits}p)</span>
+
+    <div class="group-section" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e2e8f0;">
+      <div class="group-title">Kompletteringsgruppen (BII) <span class="badge-bii">Komvux inkluderat</span></div>
+      <div class="score-row"><span>Jämförelsetal (BII):</span> <strong>${bii.gpa.toFixed(2)}</strong></div>
+      <div class="score-row"><span>Meritpoäng (BII):</span> <strong style="color: #047857;">+${biiMerit.totalMerit.toFixed(2)}</strong></div>
+      <div class="score-row final-row">
+        <span><strong>Slutgiltigt Meritvärde (BII):</strong></span>
+        <strong class="final-score-value" style="color: #1e3a8a;">${finalBII.toFixed(2)}</strong>
+      </div>
+      <div class="score-row stats-row">
+        <span>Komvux/Enstaka kurser funna: <strong>${komvuxCount} st</strong></span>
+      </div>
     </div>
     
-    <div class="merit-analysis-box">
-      <h4>✨ Fördelning av Meritpoäng</h4>
-      <p class="merit-disclaimer">Klicka på ett ämne nedan för att se vilka kurser som är inkluderade.</p>
-      ${meritHtml}
+    <div class="merit-analysis-box" style="margin-top: 12px;">
+      <h4>✨ Fördelning av Meritpoäng (BII)</h4>
+      <p class="merit-disclaimer">Visar kurser och maxtak baserat på dina samlade betyg:</p>
+      ${meritDropdownsHtml}
     </div>
   `;
 
