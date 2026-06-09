@@ -1,13 +1,14 @@
 window.addEventListener('load', () => {
-  setTimeout(calculateGeneralAdmissions, 1000);
+  setTimeout(calculateSplitAdmissions, 1000);
 });
 
-function calculateGeneralAdmissions() {
-  const rows = document.querySelectorAll('.table-desktop tbody tr');
+function calculateSplitAdmissions() {
+  const rows = document.querySelectorAll('.table-desktop tbody tr, table tbody tr');
   if (rows.length === 0) return;
 
   const gradeScale = { 'A': 20.0, 'B': 17.5, 'C': 15.0, 'D': 12.5, 'E': 10.0, 'F': 0.0 };
-  let parsedCourses = [];
+  let gymnasieCourses = [];
+  let komvuxCourses = [];
 
   rows.forEach(row => {
     const cells = row.querySelectorAll('td, th');
@@ -17,37 +18,49 @@ function calculateGeneralAdmissions() {
     const code = cells[1].innerText.trim().toUpperCase();
     const grade = cells[2].innerText.trim().toUpperCase();
     const credits = parseInt(cells[3].innerText.trim(), 10);
-    const note = cells[4] ? cells[4].innerText.trim().toUpperCase() : '';
+    const rowText = row.innerText.toLowerCase();
+    const parentSection = row.closest('.betyg-section, div, table')?.innerText.toLowerCase() || '';
 
     if (isNaN(credits)) return;
 
-    parsedCourses.push({
-      name,
-      code,
-      grade,
-      gradeValue: gradeScale[grade] || 0,
-      credits,
-      isExtended: (note === 'U' || note.includes('U'))
+    let isKomvux = false;
+    cells.forEach(cell => {
+      const cellText = cell.innerText.trim().toLowerCase();
+      if (cellText === 'komvux' || cellText === 'v') isKomvux = true;
     });
+    if (rowText.includes('komvux') || parentSection.includes('enstaka betyg') || parentSection.includes('vuxen')) isKomvux = true;
+
+    const isExtended = rowText.includes(' utökad') || rowText.includes(' (u)');
+    const isGymnasiearbete = name.toLowerCase().includes('gymnasiearbete') || code === 'GYARTE';
+
+    const courseObj = { name, code, grade, gradeValue: gradeScale[grade] || 0, credits, isExtended, isGymnasiearbete };
+
+    if (isGymnasiearbete) {
+      gymnasieCourses.push(courseObj);
+    } else if (isKomvux) {
+      komvuxCourses.push(courseObj);
+    } else {
+      gymnasieCourses.push(courseObj);
+    }
   });
 
-  const baseResult = calculateStandardGpa(parsedCourses);
-  const meritResult = calculateAdvancedMerit(parsedCourses);
+  const biResult = calculateGpaTrack(gymnasieCourses);
+  const biMerit = calculateAdvancedMerit([...gymnasieCourses]);
 
-  injectGeneralWidget(baseResult, meritResult);
+  const biiResult = calculateGpaTrack([...gymnasieCourses, ...komvuxCourses]);
+  const biiMerit = calculateAdvancedMerit([...gymnasieCourses, ...komvuxCourses]);
+
+  injectCleanWidget(biResult, biMerit, biiResult, biiMerit, komvuxCourses.length);
 }
 
-function calculateStandardGpa(courses) {
+function calculateGpaTrack(courses) {
   let totalPoints = 0;
   let totalCreditsForGpa = 0;
   let totalCreditsOverall = 0;
 
   courses.forEach(c => {
     totalCreditsOverall += c.credits;
-
-    const isGymnasiearbete = c.name.toLowerCase().includes('gymnasiearbete') || c.code === 'GYARTE';
-    if (isGymnasiearbete || c.isExtended) return; 
-
+    if (c.isGymnasiearbete || c.isExtended) return;
     totalPoints += c.gradeValue * c.credits;
     totalCreditsForGpa += c.credits;
   });
@@ -68,9 +81,7 @@ function calculateAdvancedMerit(courses) {
 
   courses.forEach(c => {
     const nameLower = c.name.toLowerCase();
-    const codePrefix = c.code.substring(0, 6);
-    
-    if (c.grade === 'F' || c.grade === '-') return;
+    if (c.grade === 'F' || c.grade === '-' || c.isGymnasiearbete) return;
 
     if (nameLower.includes('engelska 6') || c.code === 'ENGENG06') {
       categories['Engelska'].courses.push({ name: 'Engelska 6', points: 0.5 });
@@ -80,142 +91,115 @@ function calculateAdvancedMerit(courses) {
       categories['Engelska'].courses.push({ name: 'Engelska 7', points: 1.0 });
       categories['Engelska'].rawPoints += 1.0;
     }
-
-    if (nameLower.includes('matematik 2') || c.code === 'MATMAT02C' || c.code === 'MATMAT02B') {
+    if (nameLower.includes('matematik 2') || c.code.startsWith('MATMAT02')) {
       categories['Matematik'].courses.push({ name: c.name, points: 0.5 });
       categories['Matematik'].rawPoints += 0.5;
     }
-    if (nameLower.includes('matematik 3') || c.code === 'MATMAT03C' || c.code === 'MATMAT03B') {
+    if (nameLower.includes('matematik 3') || c.code.startsWith('MATMAT03')) {
       categories['Matematik'].courses.push({ name: c.name, points: 0.5 });
       categories['Matematik'].rawPoints += 0.5;
     }
-    if (nameLower.includes('matematik 4') || c.code === 'MATMAT04') {
+    if (nameLower.includes('matematik 4') || c.code.startsWith('MATMAT04')) {
       categories['Matematik'].courses.push({ name: 'Matematik 4', points: 0.5 });
       categories['Matematik'].rawPoints += 0.5;
     }
-    if (nameLower.includes('matematik 5') || c.code === 'MATMAT05') {
+    if (nameLower.includes('matematik 5') || c.code.startsWith('MATMAT05')) {
       categories['Matematik'].courses.push({ name: 'Matematik 5', points: 1.0 });
       categories['Matematik'].rawPoints += 1.0;
     }
-
-    if (codePrefix === 'MODSPA' || codePrefix === 'MODFRA' || codePrefix === 'MODTYS' || nameLower.includes('moderna språk')) {
-      if (nameLower.includes('3')) {
-        categories['Moderna Språk'].courses.push({ name: c.name, points: 0.5 });
-        categories['Moderna Språk'].rawPoints += 0.5;
-      } else if (nameLower.includes('4')) {
-        categories['Moderna Språk'].courses.push({ name: c.name, points: 1.0 });
-        categories['Moderna Språk'].rawPoints += 1.0;
-      } else if (nameLower.includes('5')) {
-        categories['Moderna Språk'].courses.push({ name: c.name, points: 1.5 });
-        categories['Moderna Språk'].rawPoints += 1.5;
-      }
+    if (c.code.substring(0, 6).includes('MOD') || nameLower.includes('moderna språk')) {
+      if (nameLower.includes('3')) { categories['Moderna Språk'].courses.push({ name: c.name, points: 0.5 }); categories['Moderna Språk'].rawPoints += 0.5; }
+      else if (nameLower.includes('4')) { categories['Moderna Språk'].courses.push({ name: c.name, points: 1.0 }); categories['Moderna Språk'].rawPoints += 1.0; }
+      else if (nameLower.includes('5')) { categories['Moderna Språk'].courses.push({ name: c.name, points: 1.5 }); categories['Moderna Språk'].rawPoints += 1.5; }
     }
   });
 
   let totalMeritBidrag = 0;
-  let flatCourseList = [];
-
   for (let catName in categories) {
     let cat = categories[catName];
     cat.actualContribution = Math.min(cat.rawPoints, cat.maxCap);
     totalMeritBidrag += cat.actualContribution;
-
-    cat.courses.forEach(course => {
-      flatCourseList.push({
-        ...course,
-        category: catName,
-        catActual: cat.actualContribution,
-        catRaw: cat.rawPoints,
-        catCap: cat.maxCap
-      });
-    });
   }
-
-  totalMeritBidrag = Math.min(totalMeritBidrag, 2.5);
-
-  return {
-    courses: flatCourseList,
-    categories: categories,
-    totalMerit: totalMeritBidrag
-  };
+  return { categories, totalMerit: Math.min(totalMeritBidrag, 2.5) };
 }
 
-function injectGeneralWidget(baseResult, meritResult) {
+function injectCleanWidget(bi, biMerit, bii, biiMerit, komvuxCount) {
   const existing = document.getElementById('antagning-math-widget');
   if (existing) existing.remove();
 
   const widget = document.createElement('div');
   widget.id = 'antagning-math-widget';
-  
-  let meritHtml = '';
-  if (meritResult.courses.length === 0) {
-    meritHtml = '<p class="empty-merit">Inga meritkurser hittades på sidan.</p>';
-  } else {
-    meritHtml = '<div class="dropdown-container">';
-    
-    for (let catName in meritResult.categories) {
-      const cat = meritResult.categories[catName];
-      if (cat.courses.length === 0) continue;
 
-      const isCapped = cat.rawPoints > cat.maxCap;
+  const finalBI = bi.gpa + biMerit.totalMerit;
+  const finalBII = bii.gpa + biiMerit.totalMerit;
 
-      meritHtml += `
-        <details class="merit-dropdown">
-          <summary>
-            <div class="summary-header">
-              <span class="course-badge ${catName.toLowerCase().replace(' ', '-')}">${catName}</span>
-              <span class="contribution-text" style="color: ${isCapped ? '#cc2929' : '#047857'}">
-                +${cat.actualContribution.toFixed(1)} p ${isCapped ? `(Tak: ${cat.maxCap.toFixed(1)})` : ''}
-              </span>
-            </div>
-            <span class="dropdown-arrow">▼</span>
-          </summary>
-          <ul class="dropdown-course-list">
-      `;
-
-      cat.courses.forEach(course => {
-        meritHtml += `
-          <li>
-            <span class="bullet">•</span>
-            <span class="c-name">${course.name}</span>
-            <span class="c-points">(+${course.points.toFixed(1)} p)</span>
-          </li>
-        `;
-      });
-
-      meritHtml += `
-          </ul>
-        </details>
-      `;
-    }
-    meritHtml += '</div>';
+  // Bygg Merit-dropdowns
+  let meritDropdownsHtml = '';
+  for (let catName in biiMerit.categories) {
+    const cat = biiMerit.categories[catName];
+    if (cat.courses.length === 0) continue;
+    const isCapped = cat.rawPoints > cat.maxCap;
+    meritDropdownsHtml += `
+      <details class="merit-sub-dropdown">
+        <summary>
+          <span>${catName}</span>
+          <span style="color: ${isCapped ? '#cc2929' : '#047857'}">+${cat.actualContribution.toFixed(1)} p</span>
+        </summary>
+        <ul>
+          ${cat.courses.map(c => `<li><span>${c.name}</span> <span>+${c.points.toFixed(1)}</span></li>`).join('')}
+        </ul>
+      </details>`;
   }
 
-  const slutgiltigtMeritvärde = baseResult.gpa + meritResult.totalMerit;
-
+  // open har tagits bort från .main-group-dropdown för BI nedan
   widget.innerHTML = `
-    <h3>🎓 Antagningsnivå</h3>
+    <h3>🎓 Antagningsnivåer</h3>
     <hr>
-    <div class="score-row">
-      <span>Jämförelsetal (BI):</span>
-      <strong>${baseResult.gpa.toFixed(2)}</strong>
-    </div>
-    <div class="score-row">
-      <span>Meritpoäng (Max 2.5):</span>
-      <strong style="color: #047857;">+${meritResult.totalMerit.toFixed(2)}</strong>
-    </div>
-    <div class="score-row final-row">
-      <span><strong>Slutgiltigt Meritvärde:</strong></span>
-      <strong class="final-score-value">${slutgiltigtMeritvärde.toFixed(2)}</strong>
-    </div>
-    <div class="score-row stats-row">
-      <span>Räknade poäng: ${baseResult.calculatedCredits}p (Totalt ${baseResult.totalCredits}p)</span>
-    </div>
     
+    <details class="main-group-dropdown">
+      <summary>
+        <div class="summary-content">
+          <span class="group-label bi">BI</span>
+          <span class="group-name">Direktgruppen</span>
+          <span class="group-score">${finalBI.toFixed(2)}</span>
+        </div>
+      </summary>
+      <div class="dropdown-body">
+        <div class="row"><span>Jämförelsetal:</span> <span>${bi.gpa.toFixed(2)}</span></div>
+        <div class="row"><span>Meritpoäng:</span> <span style="color: #047857;">+${biMerit.totalMerit.toFixed(2)}</span></div>
+        <div class="row footer"><span>Beräknat på:</span> <span>${bi.calculatedCredits}p</span></div>
+      </div>
+    </details>
+
+    <details class="main-group-dropdown">
+      <summary>
+        <div class="summary-content">
+          <span class="group-label bii">BII</span>
+          <span class="group-name">Komplettering</span>
+          <span class="group-score" style="color: #1e3a8a;">${finalBII.toFixed(2)}</span>
+        </div>
+      </summary>
+      <div class="dropdown-body">
+        <div class="row"><span>Jämförelsetal:</span> <span>${bii.gpa.toFixed(2)}</span></div>
+        <div class="row"><span>Meritpoäng:</span> <span style="color: #047857;">+${biiMerit.totalMerit.toFixed(2)}</span></div>
+        <div class="row footer"><span>Komvux-kurser:</span> <span>${komvuxCount} st</span></div>
+      </div>
+    </details>
+
     <div class="merit-analysis-box">
-      <h4>✨ Fördelning av Meritpoäng</h4>
-      <p class="merit-disclaimer">Klicka på ett ämne nedan för att se vilka kurser som är inkluderade.</p>
-      ${meritHtml}
+      <details class="main-group-dropdown">
+        <summary>
+          <div class="summary-content">
+            <span class="group-label merit">✨</span>
+            <span class="group-name">Meritfördelning</span>
+            <span class="group-score" style="color: #047857;">+${biiMerit.totalMerit.toFixed(2)}</span>
+          </div>
+        </summary>
+        <div class="dropdown-body">
+          <p class="merit-info">Hänsyn tagen till ämnesspecifika tak.</p>
+          ${meritDropdownsHtml}
+        </div>
+      </details>
     </div>
   `;
 
